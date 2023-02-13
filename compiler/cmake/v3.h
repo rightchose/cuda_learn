@@ -14,6 +14,6 @@ class v3
     void randomize();
     __host__ __device__ void normalize();
     __host__ __device__ void scramble();
-}
+};
 
 #endif
