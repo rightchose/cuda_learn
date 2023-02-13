@@ -10,4 +10,7 @@ project(cmake_and_cuda LANGUAGES CXX CUDA)
 
 
 # 指定生成目标
-add_executable(testc )
+add_executable(test1 test1.cu)
+
+
+
