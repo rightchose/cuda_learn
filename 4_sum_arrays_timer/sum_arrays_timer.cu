@@ -4,7 +4,7 @@
 
 void sumArrays(float *a, float *b, float *res, const int size)
 {
-    for (int i = 0; i < size; i += 4)
+    for (int i = 0; i < size; i+=4)
     {
         res[i] = a[i] + b[i];
         res[i + 1] = a[i + 1] + b[i + 1];
@@ -12,19 +12,22 @@ void sumArrays(float *a, float *b, float *res, const int size)
         res[i + 3] = a[i + 3] + b[i + 3];
     }
 }
-__global__ void sumArraysGPU(float *a, float *b, float *res)
+
+__global__ void sumArraysGPU(float *a, float *b, float *res, int N)
 {
-    // int i=threadIdx.x;
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    res[i] = a[i] + b[i];
+    if(i < N)
+        res[i] = a[i] + b[i];
 }
+
 int main(int argc, char **argv)
 {
-    int dev = 0;
-    cudaSetDevice(dev);
+    // set up device
+    initDevice(0);
 
-    int nElem = 1 << 14;
+    int nElem = 1 << 24;
     printf("Vector size:%d\n", nElem);
+
     int nByte = sizeof(float) * nElem;
     float *a_h = (float *)malloc(nByte);
     float *b_h = (float *)malloc(nByte);
@@ -41,16 +44,25 @@ int main(int argc, char **argv)
     initialData(a_h, nElem);
     initialData(b_h, nElem);
 
+    
+
+    dim3 block(512);
+    dim3 grid((nElem-1)/block.x+1);
+
+    // timer
+    double iStart, iElaps;
+    iStart = cpuSecond();
     CHECK(cudaMemcpy(a_d, a_h, nByte, cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(b_d, b_h, nByte, cudaMemcpyHostToDevice));
-
-    dim3 block(1024);
-    dim3 grid(nElem / block.x);
-    sumArraysGPU<<<grid, block>>>(a_d, b_d, res_d);
-    printf("Execution configuration<<<%d,%d>>>\n", grid.x, block.x);
-
+    sumArraysGPU<<<grid, block>>>(a_d, b_d, res_d, nElem);
     CHECK(cudaMemcpy(res_from_gpu_h, res_d, nByte, cudaMemcpyDeviceToHost));
+    iElaps = cpuSecond() - iStart;
+    printf("Execution configuration<<<%d,%d>>> Time elapsed %f sec\n", grid.x, block.x, iElaps);
+
+    iStart = cpuSecond();
     sumArrays(a_h, b_h, res_h, nElem);
+    iElaps = cpuSecond() - iStart;
+    printf("Execution on cpu Time elapsed %f sec\n", iElaps);
 
     checkResult(res_h, res_from_gpu_h, nElem);
     cudaFree(a_d);
